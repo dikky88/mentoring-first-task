@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AsyncPipe, NgForOf } from '@angular/common';
 import { UsersApiService } from '../services/users-api.service';
 import { UserCardComponent } from './user-card/user-card.component';
-import { UsersService } from '../services/users.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditUserComponent } from './create-edit-user/create-edit-user.component';
@@ -13,6 +12,9 @@ import {
   MatCardTitle,
 } from '@angular/material/card';
 import { CreateEditUser, User } from '../interfaces/user.interface';
+import { Store } from '@ngrx/store';
+import { UsersActions } from './store/users.actions';
+import { selectUsers } from './store/users.selectors';
 
 @Component({
   selector: 'app-users-list',
@@ -33,44 +35,38 @@ import { CreateEditUser, User } from '../interfaces/user.interface';
 })
 export class UsersListComponent {
   private readonly usersApiService = inject(UsersApiService);
-  private readonly usersService = inject(UsersService);
   private readonly dialog = inject(MatDialog);
-
-  public readonly users$ = this.usersService.users$;
+  private readonly store = inject(Store);
+  public readonly users$ = this.store.select(selectUsers);
 
   constructor() {
-    this.users$ = this.usersService.users$;
-
-    if (this.usersService.loadUsersFromStorage().length === 0) {
-      this.usersApiService.getUsers().subscribe((response: User[]) => {
-        this.usersService.setUsers(response);
-      });
-    }
+    this.usersApiService.getUsers().subscribe((response: User[]) => {
+      this.store.dispatch(UsersActions.set({ users: response }));
+    });
   }
 
   public deleteUser(id: number) {
-    this.usersService.deleteUser(id);
+    this.store.dispatch(UsersActions.delete({ id }));
   }
 
   public editUser(user: CreateEditUser) {
-    this.usersService.editUser({
-      ...user,
-      company: {
-        name: user.companyName,
-      },
-    });
+    this.store.dispatch(UsersActions.edit({ user }));
   }
 
   public createUser(formData: CreateEditUser) {
-    this.usersService.createUser({
-      id: new Date().getTime(),
-      name: formData.name,
-      email: formData.email,
-      website: formData.website,
-      company: {
-        name: formData.companyName,
-      },
-    });
+    this.store.dispatch(
+      UsersActions.create({
+        user: {
+          id: new Date().getTime(),
+          name: formData.name,
+          email: formData.email,
+          website: formData.website,
+          company: {
+            name: formData.name,
+          },
+        },
+      }),
+    );
   }
 
   public openDialog(user: string | User = ''): void {
